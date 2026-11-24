@@ -26,13 +26,14 @@ export function checkPassword(pw, stored) {
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
 
 function publicUser(u) {
-  return { id: u.id, email: u.email, name: u.name, free_weddings_left: u.free_weddings_left, created_at: u.created_at };
+  return { id: u.id, email: u.email, name: u.name, free_weddings_left: u.free_weddings_left, created_at: u.created_at, has_password: !!u.password_hash };
 }
 
 function createUser(ctx, { email, passwordHash = null, name = null }) {
   const id = newId('u');
-  ctx.db.app.run('INSERT INTO users (id, email, password_hash, name, free_weddings_left, created_at) VALUES (?,?,?,?,?,?)',
-    id, email, passwordHash, name, ctx.cfg.freeWeddings, now());
+  // 약관·처리방침 동의: 이메일 가입은 체크(필수), 구글·카카오는 버튼 아래 '계속하면 동의' 안내를 보고 누른 것으로 기록
+  ctx.db.app.run('INSERT INTO users (id, email, password_hash, name, free_weddings_left, created_at, terms_version, terms_agreed_at) VALUES (?,?,?,?,?,?,?,?)',
+    id, email, passwordHash, name, ctx.cfg.freeWeddings, now(), ctx.cfg.termsVersion || '2026-11-trial', now());
   return ctx.db.app.get('SELECT * FROM users WHERE id=?', id);
 }
 
@@ -67,6 +68,7 @@ async function signup(ctx, req, res) {
   const pw = String(b.password || '');
   if (!EMAIL.test(email)) throw new HttpError(400, '이메일 형식이 아니에요');
   if (pw.length < 8 || pw.length > 200) throw new HttpError(400, '비밀번호는 8자 이상이어야 해요');
+  if (b.agree !== true) throw new HttpError(400, '이용 약관과 개인정보 처리방침에 동의해 주세요');
   loginLimit('signup:' + (req.socket.remoteAddress || ''));
   if (ctx.db.app.get('SELECT 1 FROM users WHERE email=?', email)) throw new HttpError(409, '이미 가입된 이메일이에요');
   const u = createUser(ctx, { email, passwordHash: hashPassword(pw), name: b.name ? String(b.name).slice(0, 60) : null });
@@ -79,7 +81,7 @@ async function login(ctx, req, res) {
   const email = String(b.email || '').trim().toLowerCase();
   loginLimit('login:' + email);
   loginLimit('ip:' + (req.socket.remoteAddress || ''));
-  const u = ctx.db.app.get('SELECT * FROM users WHERE email=?', email);
+  const u = ctx.db.app.get('SELECT * FROM users WHERE email=? AND deleted_at IS NULL', email);
   if (!u || !checkPassword(String(b.password || ''), u.password_hash)) throw new HttpError(401, '이메일 또는 비밀번호가 맞지 않아요');
   const token = startSession(ctx, res, u.id);
   send(res, 200, { user: publicUser(u), token });

@@ -11,7 +11,10 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT,                  -- 구글·카카오만 쓰면 비어 있음
   name TEXT,
   free_weddings_left INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  terms_version TEXT,                  -- 동의한 약관·처리방침 판(예: '2026-11-trial')
+  terms_agreed_at TEXT,
+  deleted_at TEXT                      -- 탈퇴: 이메일·이름을 지우고 이 시각을 남김(결제 기록 보관 때문에 행은 남김)
 );
 CREATE TABLE IF NOT EXISTS oauth_accounts (
   provider TEXT NOT NULL, subject TEXT NOT NULL, user_id TEXT NOT NULL REFERENCES users(id),
@@ -75,6 +78,9 @@ export function openDbs(cfg) {
   if (!app.prepare('PRAGMA table_info(weddings)').all().some((c) => c.name === 'planned')) {
     app.exec('ALTER TABLE weddings ADD COLUMN planned INTEGER');
   }
+  // 2026-11-24: 가입 동의 기록·계정 탈퇴
+  const ucols = app.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
+  for (const c of ['terms_version', 'terms_agreed_at', 'deleted_at']) if (!ucols.includes(c)) app.exec(`ALTER TABLE users ADD COLUMN ${c} TEXT`);
   const jobs = open(cfg.jobsDb, JOBS_SCHEMA);
   const q = (db) => ({
     get: (sql, ...a) => db.prepare(sql).get(...a),

@@ -34,7 +34,7 @@ async function wait(wid, job, label) {
 
 const email = `e2e-${Date.now()}@example.com`;
 token = (await (await fetch(base + '/api/auth/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ email, password: 'e2e-password-1' }) })).json()).token;
+  body: JSON.stringify({ email, password: 'e2e-password-1', agree: true }) })).json()).token;
 log('가입', email);
 const { wedding } = await api('POST', '/api/weddings', { title: '끝까지 시험' });
 const wid = wedding.id;

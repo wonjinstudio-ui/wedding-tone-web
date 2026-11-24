@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { pipeline } from 'node:stream/promises';
-import { HttpError, send, readJson, readBody } from './http.js';
-import { requireUser } from './auth.js';
+import { HttpError, send, readJson, readBody, cookie } from './http.js';
+import { requireUser, checkPassword } from './auth.js';
 import { newId, now, isoAfter, submitJob, jobView, activeJob, lastJob } from './db.js';
 
 const NAME = /^[A-Za-z0-9가-힣._ ()\-]{1,120}\.(jpe?g)$/i;
@@ -71,6 +71,34 @@ function remove(ctx, req, res, { id }) {
   ctx.db.app.run('UPDATE weddings SET deleted_at=? WHERE id=?', now(), w.id);
   const job = submitJob(ctx.db, w.id, 'delete');
   send(res, 202, { ok: true, job });
+}
+
+// ---------- 계정 탈퇴 (2026-11-24) ----------
+// 결혼식마다 delete 작업(올린 사진·결과·작업 폴더)을 넣고, 작가 필터를 지우고, 로그인 정보를 지움.
+// 결제 기록 보관 의무 때문에 users 행은 남기되 이메일·이름·비밀번호를 비우고 deleted_at을 남김.
+async function deleteAccount(ctx, req, res) {
+  const u = requireUser(ctx, req);
+  const b = await readJson(req);
+  if (u.password_hash) {
+    if (!checkPassword(String(b.password || ''), u.password_hash)) throw new HttpError(401, '비밀번호가 맞지 않아요');
+  } else if (String(b.confirm || '') !== '탈퇴') {
+    throw new HttpError(400, "확인을 위해 '탈퇴'라고 입력해 주세요");
+  }
+  const ws = ctx.db.app.all('SELECT id FROM weddings WHERE user_id=? AND deleted_at IS NULL', u.id);
+  for (const w of ws) {
+    ctx.db.app.run('UPDATE weddings SET deleted_at=? WHERE id=?', now(), w.id);
+    submitJob(ctx.db, w.id, 'delete');
+  }
+  // 작가 필터(엔진 폴더). 엔진이 꺼져 있어도 탈퇴는 진행하고, 남은 필터는 다음 정리 때 지움
+  await engine(ctx, 'DELETE', `/v1/users/${u.id}`).catch(() => null);
+  ctx.db.app.tx(() => {
+    ctx.db.app.run('DELETE FROM sessions WHERE user_id=?', u.id);
+    ctx.db.app.run('DELETE FROM oauth_accounts WHERE user_id=?', u.id);
+    ctx.db.app.run('DELETE FROM user_prefs WHERE user_id=?', u.id);
+    ctx.db.app.run('UPDATE users SET email=NULL, name=NULL, password_hash=NULL, deleted_at=? WHERE id=?', now(), u.id);
+  });
+  res.setHeader('Set-Cookie', cookie('ws_session', '', { maxAge: 0, secure: ctx.cfg.prod }));
+  send(res, 200, { ok: true, weddings_deleted: ws.length });
 }
 
 // ---------- 업로드 ----------
@@ -303,6 +331,7 @@ export function weddingRoutes(router) {
     .add('POST', '/api/weddings', create)
     .add('GET', W, detail)
     .add('DELETE', W, remove)
+    .add('DELETE', '/api/me', deleteAccount)
     .add('POST', `${W}/uploads`, uploadPlan)
     .add('PUT', `${W}/files/:name`, uploadFile)
     .add('POST', `${W}/analyze`, analyze)

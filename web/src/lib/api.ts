@@ -21,7 +21,7 @@ async function req<T>(method: string, path: string, body?: unknown, init: Reques
   return data as T;
 }
 
-export type User = { id: string; email: string | null; name: string | null; free_weddings_left: number };
+export type User = { id: string; email: string | null; name: string | null; free_weddings_left: number; created_at?: string; has_password?: boolean };
 export type JobView = {
   id: string; kind: "prepare" | "learn" | "export" | "delete"; state: "queued" | "running" | "done" | "failed" | "canceled";
   progress: number; message: string | null; result: Record<string, unknown> | null; error: string | null;
@@ -54,7 +54,9 @@ export const api = {
   me: () => req<{ user: User }>("GET", "/api/me"),
   prefs: () => req<{ prefs: AccountPrefs }>("GET", "/api/me/prefs"),
   savePrefs: (p: Partial<AccountPrefs>) => req<{ prefs: AccountPrefs }>("PUT", "/api/me/prefs", p),
-  signup: (email: string, password: string) => req<{ user: User }>("POST", "/api/auth/signup", { email, password }),
+  signup: (email: string, password: string, agree: boolean) => req<{ user: User }>("POST", "/api/auth/signup", { email, password, agree }),
+  /** 계정 탈퇴: 이메일 가입은 비밀번호, 구글·카카오 가입은 confirm '탈퇴' */
+  deleteAccount: (body: { password?: string; confirm?: string }) => req<{ ok: boolean; weddings_deleted: number }>("DELETE", "/api/me", body),
   login: (email: string, password: string) => req<{ user: User }>("POST", "/api/auth/login", { email, password }),
   logout: () => req("POST", "/api/auth/logout"),
 

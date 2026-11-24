@@ -1,5 +1,6 @@
 "use client";
 // ① 가입·로그인 폼. 왼쪽 = 서비스가 하는 일(바탕체 제목 + 세 줄), 오른쪽 = 카카오 → 구글 → 이메일. DESIGN.md 12절
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -25,12 +26,13 @@ export function LoginForm({ hero }: { hero: string | null }) {
   const [pw, setPw] = useState("");
   const [err, setErr] = useState<string | null>(params.get("error"));
   const [busy, setBusy] = useState(false);
+  const [agree, setAgree] = useState(false);   // 가입할 때만: 이용 약관·개인정보 처리방침 동의(필수)
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null); setBusy(true);
     try {
-      if (mode === "login") await api.login(email, pw); else await api.signup(email, pw);
+      if (mode === "login") await api.login(email, pw); else await api.signup(email, pw, agree);
       await qc.invalidateQueries({ queryKey: ["me"] });
       router.replace("/");
     } catch (x) {
@@ -98,6 +100,11 @@ export function LoginForm({ hero }: { hero: string | null }) {
             </a>
           </div>
 
+          <p className="mt-3 text-center text-xs text-text-3">
+            계속하면 <Link href="/terms" className="underline underline-offset-2">이용 약관</Link>과{" "}
+            <Link href="/privacy" className="underline underline-offset-2">개인정보 처리방침</Link>에 동의하는 것으로 봐요.
+          </p>
+
           <div className="my-6 flex items-center gap-3 text-xs text-text-3">
             <span className="h-px flex-1 bg-line" /> 또는 이메일 <span className="h-px flex-1 bg-line" />
           </div>
@@ -113,8 +120,17 @@ export function LoginForm({ hero }: { hero: string | null }) {
               <Input id="pw" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={8}
                 value={pw} onChange={(e) => setPw(e.target.value)} className="h-12 rounded-xl border-line bg-bg px-4 text-md" />
             </div>
+            {mode === "signup" && (
+              <label className="flex items-start gap-2.5 text-sm text-text-2">
+                <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} aria-label="이용 약관과 개인정보 처리방침에 동의합니다(필수)" className="mt-0.5 size-4 accent-[var(--text)]" />
+                <span>
+                  <Link href="/terms" target="_blank" className="font-medium text-text underline underline-offset-2">이용 약관</Link>과{" "}
+                  <Link href="/privacy" target="_blank" className="font-medium text-text underline underline-offset-2">개인정보 처리방침</Link>(사진의 국외 서버 처리 포함)에 동의합니다 <span className="text-text-3">(필수)</span>
+                </span>
+              </label>
+            )}
             {err && <p role="alert" className="text-sm text-danger-fg">{err}</p>}
-            <Button type="submit" disabled={busy || !email || pw.length < (mode === "signup" ? 8 : 1)} className="h-12 w-full rounded-xl text-[15px]">
+            <Button type="submit" disabled={busy || !email || pw.length < (mode === "signup" ? 8 : 1) || (mode === "signup" && !agree)} className="h-12 w-full rounded-xl text-[15px]">
               {busy ? "잠시만요…" : mode === "login" ? "로그인" : "가입하고 시작하기"}
             </Button>
           </form>

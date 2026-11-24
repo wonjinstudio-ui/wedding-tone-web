@@ -75,14 +75,17 @@ test('가입·로그인·내 정보·중복·틀린 비밀번호', async () => {
   let r = await call('POST', '/api/auth/signup', { json: { email: 'A@Example.com', password: 'short' } });
   assert.equal(r.status, 400);
   r = await call('POST', '/api/auth/signup', { json: { email: 'a@example.com', password: 'password123' } });
+  assert.equal(r.status, 400);                                                                  // 약관 동의 없음
+  r = await call('POST', '/api/auth/signup', { json: { email: 'a@example.com', password: 'password123', agree: true } });
   assert.equal(r.status, 201); A = r.body.token;
+  assert.equal(app.ctx.db.app.get('SELECT terms_version FROM users WHERE email=?', 'a@example.com').terms_version, '2026-11-trial');
   assert.equal(r.body.user.free_weddings_left, 1);
   assert.match(r.headers.get('set-cookie'), /ws_session=.*HttpOnly; SameSite=Lax/);
-  r = await call('POST', '/api/auth/signup', { json: { email: 'a@example.com', password: 'password123' } });
+  r = await call('POST', '/api/auth/signup', { json: { email: 'a@example.com', password: 'password123', agree: true } });
   assert.equal(r.status, 409);
   r = await call('POST', '/api/auth/login', { json: { email: 'a@example.com', password: 'nope-nope' } });
   assert.equal(r.status, 401);
-  r = await call('POST', '/api/auth/signup', { json: { email: 'b@example.com', password: 'password456' } });
+  r = await call('POST', '/api/auth/signup', { json: { email: 'b@example.com', password: 'password456', agree: true } });
   B = r.body.token;
   r = await call('GET', '/api/me', { token: A });
   assert.equal(r.body.user.email, 'a@example.com');
@@ -237,4 +240,20 @@ test('작가 설정(필터 조정값)은 계정마다 따로 저장', async () =
   assert.equal((await call('PUT', '/api/me/prefs', { token: A, json: { lookAdj: { x: { strength: 9, adjust: {} } } } })).status, 400);
   assert.equal((await call('PUT', '/api/me/prefs', { token: A, json: { look: '<script>' } })).status, 400);
   assert.equal((await call('GET', '/api/me/prefs')).status, 401);
+});
+
+test('계정 탈퇴: 비밀번호 확인 → 결혼식 삭제 작업 → 로그인 불가 → 같은 이메일로 다시 가입 가능', async () => {
+  let r = await call('POST', '/api/auth/signup', { json: { email: 'bye@example.com', password: 'password789', agree: true } });
+  const T = r.body.token;
+  r = await call('POST', '/api/weddings', { token: T, json: { title: '지울 결혼식' } });
+  const w = r.body.wedding.id;
+  assert.equal((await call('DELETE', '/api/me', { token: T, json: { password: 'wrong-pass' } })).status, 401);
+  r = await call('DELETE', '/api/me', { token: T, json: { password: 'password789' } });
+  assert.equal(r.status, 200); assert.equal(r.body.weddings_deleted, 1);
+  assert.ok(app.ctx.db.jobs.get("SELECT 1 FROM jobs WHERE wedding_id=? AND kind='delete'", w));
+  assert.equal((await call('GET', '/api/me', { token: T })).status, 401);                       // 세션 끊김
+  assert.equal((await call('POST', '/api/auth/login', { json: { email: 'bye@example.com', password: 'password789' } })).status, 401);
+  const row = app.ctx.db.app.get("SELECT email, password_hash, deleted_at FROM users WHERE id=(SELECT user_id FROM weddings WHERE id=?)", w);
+  assert.equal(row.email, null); assert.equal(row.password_hash, null); assert.ok(row.deleted_at);
+  assert.equal((await call('POST', '/api/auth/signup', { json: { email: 'bye@example.com', password: 'password789', agree: true } })).status, 201);
 });

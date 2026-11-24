@@ -42,6 +42,7 @@ export default function Home() {
         <Logo />
         <nav className="flex items-center gap-5 text-sm text-text-2">
           {me.data && <span className="hidden sm:inline">{me.data.user.email ?? me.data.user.name}</span>}
+          <Link href="/account" className="hover:text-text">계정</Link>
           <button className="hover:text-text" onClick={async () => { await api.logout(); qc.clear(); router.replace("/login"); }}>로그아웃</button>
         </nav>
       </header>

@@ -41,7 +41,8 @@ cd "03_web/server" && DATA_DIR=$D ENGINE_API_KEY=devkey DEV_PAYMENTS=1 node src/
 
 | 주소 | 하는 일 |
 |---|---|
-| `POST /auth/signup` `POST /auth/login` `POST /auth/logout` `GET /me` | 이메일 가입·로그인(쿠키 또는 `Authorization: Bearer`) |
+| `POST /auth/signup` `POST /auth/login` `POST /auth/logout` `GET /me` | 이메일 가입·로그인(쿠키 또는 `Authorization: Bearer`). 가입은 `agree: true`(약관·처리방침 동의) 필수, 동의 판·시각 기록 |
+| `DELETE /me` | 계정 탈퇴: 비밀번호(구글·카카오는 `confirm: '탈퇴'`) 확인 → 결혼식마다 삭제 작업, 엔진의 작가 필터 삭제, 로그인 정보 지움 |
 | `GET /auth/google/start` · `/auth/kakao/start` → `…/callback` | 구글·카카오 로그인(키를 받으면 동작 — 아래) |
 | `GET /weddings` `POST /weddings` `GET /weddings/:id` `DELETE /weddings/:id` | 결혼식 목록·만들기·상세(단계·진행률·작업 목록)·삭제 |
 | `POST /weddings/:id/uploads` → `PUT /weddings/:id/files/:name` | 올릴 주소 받기 → 올리기(운영은 R2로 바로) |

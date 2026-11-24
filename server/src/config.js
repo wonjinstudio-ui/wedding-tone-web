@@ -45,5 +45,6 @@ export const config = {
   maxPhotos: Number(env.MAX_PHOTOS || 2500),
   maxUploadBytes: Number(env.MAX_UPLOAD_BYTES || 15 * 1024 * 1024),  // 2400px JPG 한 장 상한
   retentionDays: Number(env.RETENTION_DAYS || 14),
+  termsVersion: env.TERMS_VERSION || '2026-11-trial',   // 약관·처리방침을 바꾸면 올림
   devPayments: env.DEV_PAYMENTS === '1',            // 개발용 '결제 완료' 버튼 허용(운영에서는 끔)
 };
