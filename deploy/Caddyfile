@@ -1,0 +1,29 @@
+# /etc/caddy/Caddyfile — install.sh가 __DOMAIN__을 바꿔 넣음. HTTPS 인증서는 Caddy가 자동으로 받고 갱신함
+__DOMAIN__ {
+	# API(업로드 1GB·ZIP 내려받기 포함)는 웹 화면을 거치지 않고 API 서버로 바로
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8781 {
+			flush_interval -1
+			transport http {
+				read_timeout 30m
+				write_timeout 30m
+			}
+		}
+	}
+	handle {
+		encode zstd gzip
+		reverse_proxy 127.0.0.1:3000
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+	log {
+		output file /var/log/caddy/wsnap.log {
+			roll_size 20mb
+			roll_keep 5
+		}
+	}
+}

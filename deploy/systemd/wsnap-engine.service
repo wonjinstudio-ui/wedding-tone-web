@@ -1,0 +1,15 @@
+[Unit]
+Description=웨딩 톤 엔진 API (미리보기·기준 컷·흰색 찍기)
+After=network.target
+
+[Service]
+User=wsnap
+WorkingDirectory=/srv/wsnap/app/engine
+EnvironmentFile=/etc/wsnap/wsnap.env
+ExecStart=/srv/wsnap/venv/bin/python -m wsnap.engineapi --work-root /srv/wsnap/data/work --port 8790
+Restart=always
+RestartSec=3
+Nice=-2
+
+[Install]
+WantedBy=multi-user.target

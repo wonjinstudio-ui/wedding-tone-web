@@ -1,0 +1,14 @@
+[Unit]
+Description=웨딩 톤 API 서버 (가입·업로드·작업·다운로드)
+After=network.target
+
+[Service]
+User=wsnap
+WorkingDirectory=/srv/wsnap/app/web/server
+EnvironmentFile=/etc/wsnap/wsnap.env
+ExecStart=/usr/bin/node src/server.js
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

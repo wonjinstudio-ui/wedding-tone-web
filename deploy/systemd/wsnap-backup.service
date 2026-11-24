@@ -1,0 +1,6 @@
+[Unit]
+Description=웨딩 톤 데이터베이스 백업
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/wsnap-backup

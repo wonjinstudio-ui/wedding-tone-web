@@ -61,6 +61,15 @@ export function requireUser(ctx, req) {
   return u;
 }
 
+/** 접속한 사람의 IP. 서버 앞에 Caddy(HTTPS)를 두면 모든 접속이 127.0.0.1로 보이므로, TRUST_PROXY=1이면 앞단이 붙인 X-Forwarded-For의 첫 주소를 씀 */
+function clientIp(ctx, req) {
+  if (ctx.cfg.trustProxy) {
+    const f = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+    if (f) return f;
+  }
+  return req.socket.remoteAddress || '';
+}
+
 // ---------- 이메일 ----------
 async function signup(ctx, req, res) {
   const b = await readJson(req);
@@ -69,7 +78,7 @@ async function signup(ctx, req, res) {
   if (!EMAIL.test(email)) throw new HttpError(400, '이메일 형식이 아니에요');
   if (pw.length < 8 || pw.length > 200) throw new HttpError(400, '비밀번호는 8자 이상이어야 해요');
   if (b.agree !== true) throw new HttpError(400, '이용 약관과 개인정보 처리방침에 동의해 주세요');
-  loginLimit('signup:' + (req.socket.remoteAddress || ''));
+  loginLimit('signup:' + clientIp(ctx, req));
   if (ctx.db.app.get('SELECT 1 FROM users WHERE email=?', email)) throw new HttpError(409, '이미 가입된 이메일이에요');
   const u = createUser(ctx, { email, passwordHash: hashPassword(pw), name: b.name ? String(b.name).slice(0, 60) : null });
   const token = startSession(ctx, res, u.id);
@@ -80,7 +89,7 @@ async function login(ctx, req, res) {
   const b = await readJson(req);
   const email = String(b.email || '').trim().toLowerCase();
   loginLimit('login:' + email);
-  loginLimit('ip:' + (req.socket.remoteAddress || ''));
+  loginLimit('ip:' + clientIp(ctx, req));
   const u = ctx.db.app.get('SELECT * FROM users WHERE email=? AND deleted_at IS NULL', email);
   if (!u || !checkPassword(String(b.password || ''), u.password_hash)) throw new HttpError(401, '이메일 또는 비밀번호가 맞지 않아요');
   const token = startSession(ctx, res, u.id);

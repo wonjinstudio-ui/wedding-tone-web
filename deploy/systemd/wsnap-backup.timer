@@ -1,0 +1,9 @@
+[Unit]
+Description=웨딩 톤 데이터베이스 매일 백업(새벽 4시)
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,15 @@
+[Unit]
+Description=웨딩 톤 웹 화면 (Next.js 완성본)
+After=network.target
+
+[Service]
+User=wsnap
+WorkingDirectory=/srv/wsnap/app/web/web
+EnvironmentFile=/etc/wsnap/wsnap.env
+Environment=PORT=3000 API_ORIGIN=http://127.0.0.1:8781 NEXT_TELEMETRY_DISABLED=1
+ExecStart=/srv/wsnap/app/web/web/node_modules/.bin/next start -p 3000 -H 127.0.0.1
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
