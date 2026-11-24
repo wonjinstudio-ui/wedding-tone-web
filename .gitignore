@@ -1,0 +1,13 @@
+# 개발용 데이터: 테스트 계정 비밀번호·고객 사진·결과 ZIP
+devdata/
+# 화면 확인용 가짜 사진: 픽셀은 그림이지만 촬영 정보(카메라 일련번호·촬영 시각)는 실제 고객 원본에서 가져옴
+web/public/devfake/
+
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+.env*
+.DS_Store
+*.pem
+npm-debug.log*

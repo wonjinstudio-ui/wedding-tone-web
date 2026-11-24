@@ -1,0 +1,12 @@
+{
+  "name": "wsnap-web-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "웨딩 스냅 톤 통일 웹 서비스 — API 서버 (계정·결혼식·업로드·작업·다운로드, 엔진 API 중계)",
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js"
+  }
+}
