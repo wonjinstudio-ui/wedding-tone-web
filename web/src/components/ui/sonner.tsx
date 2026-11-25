@@ -28,10 +28,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }}
       style={
         {
+          // 2026-11-25: 정의되지 않은 변수(--popover-foreground·--border·--radius)를 가리켜 어두운 작업 화면에서 글자가 배경색과 같아 안 보였음
           "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
-          "--border-radius": "var(--radius)",
+          "--normal-text": "var(--text)",
+          "--normal-border": "var(--line)",
+          "--border-radius": "10px",
         } as React.CSSProperties
       }
       toastOptions={{

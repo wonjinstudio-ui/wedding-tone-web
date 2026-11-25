@@ -132,6 +132,17 @@ function cleanPrefs(b) {
       out.lookAdj[k] = { strength: st, adjust: adj };
     }
   }
+  // 피부 톤(2026-11-25): 필터와 따로 고르고 겹쳐 씀. 엔진 looks.SKIN_TONES
+  if ('skin' in b) {
+    const s = b.skin;
+    if (s === null) out.skin = null;
+    else {
+      const st = Number(s?.s);
+      if (typeof s !== 'object' || !['milky', 'lively', 'warm'].includes(s.key) || !Number.isFinite(st) || st < 0 || st > 1.5)
+        throw new HttpError(400, 'skin은 {key: milky·lively·warm, s: 0~1.5} 또는 null');
+      out.skin = { key: s.key, s: st };
+    }
+  }
   return out;
 }
 

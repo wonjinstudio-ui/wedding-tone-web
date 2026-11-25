@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { DesktopOnly } from "@/components/app/work-shell";
-import { PhotoStage, isTyping, useHoldSpace } from "@/components/app/photo-stage";
+import { PendingBadge, PhotoStage, isTyping, useHoldSpace } from "@/components/app/photo-stage";
 import { sign } from "@/components/app/slider-row";
 import { Kbd, LoadError, PanelLabel } from "@/components/app/bits";
 import Link from "next/link";
@@ -49,7 +49,7 @@ export default function FixesPage() {
   const finished = items.length > 0 && i >= items.length;
   const doneN = items.filter((x) => x.done).length;
   const delta: [number, number, number] = it ? [it.dx, it.dm, it.dg] : [0, 0, 0];
-  const { url } = usePreview(id, it?.id ?? null, { mode: "zone0", delta, edge: 1600 });
+  const { url, pending } = usePreview(id, it?.id ?? null, { mode: "zone0", delta, edge: 1600 });
 
   // 다음 사진 두 장을 미리 그려 둠(서버 현상 캐시를 데움)
   useEffect(() => {
@@ -160,7 +160,8 @@ export default function FixesPage() {
             </div>
           ) : (
             <>
-              <PhotoStage src={url} beforeSrc={it ? renderUrl(id, it.id, { mode: "before" }) : null} showBefore={held} />
+              <PhotoStage src={url} beforeSrc={it ? renderUrl(id, it.id, { mode: "before" }) : null} showBefore={held}
+                badge={url && pending ? <PendingBadge /> : null} />
               {/* 그림이 뜨기 전의 Enter는 저장하지 않음(안 본 사진 저장 방지) → 왜 안 넘어가는지 한 줄로 알려 줌 */}
               {it && !url && <p role="status" className="pointer-events-none absolute left-0 right-0 top-1/2 text-center text-sm text-text-3">사진을 불러오는 중… 뜨면 Enter로 저장해요</p>}
               {hintSeen < 3 && (

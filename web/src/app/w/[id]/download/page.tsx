@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Bar, Logo } from "@/components/app/bits";
 import { api, ApiError, COPY, fmt, renderUrl, type LookSpec } from "@/lib/api";
-import { lookSpec, useAccountPrefs, useMe, useWedding } from "@/lib/hooks";
+import { lookSpec, SKIN_TONES, useAccountPrefs, useMe, useWedding } from "@/lib/hooks";
 import { usePreview } from "@/lib/preview";
 
 export default function DownloadPage() {
@@ -20,8 +20,8 @@ export default function DownloadPage() {
   const wq = useWedding(id);
   const zq = useQuery({ queryKey: ["zones", id], queryFn: () => api.zones(id) });
   const lq = useQuery({ queryKey: ["looks"], queryFn: api.looks });
-  const { look, lookAdj } = useAccountPrefs();
-  const spec = lookSpec(look, lookAdj);
+  const { look, lookAdj, skin } = useAccountPrefs();
+  const spec = lookSpec(look, lookAdj, skin);
   const [busy, setBusy] = useState(false);
   const [needPay, setNeedPay] = useState(false);
 
@@ -32,7 +32,9 @@ export default function DownloadPage() {
   const running = exportJob && ["queued", "running"].includes(exportJob.state);
   const done = !!doneJob;
   const stopped = exportJob?.state === "canceled";
-  const lookName = look ? (lq.data?.find((l) => l.key === look)?.name ?? look) + (spec && typeof spec === "object" ? " (조정함)" : "") : "필터 없음";
+  const skinName = skin ? SKIN_TONES.find((t) => t.key === skin.key)?.name : undefined;
+  const filterName = look ? (lq.data?.find((l) => l.key === look)?.name ?? look) + (lookAdj?.[look] ? " (조정함)" : "") : skinName ? "" : "필터 없음";
+  const lookName = [filterName, skinName].filter(Boolean).join(" + ");
   const freeLeft = me.data?.user.free_weddings_left ?? 0;
   const willUseFree = !w?.paid && freeLeft > 0;
   const refs = zq.data?.slice(0, 2).map((z) => z.ref) ?? [];

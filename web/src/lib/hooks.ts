@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { api, ApiError, type AccountPrefs, type LookAdj, type LookSpec, type Wedding } from "./api";
+import { api, ApiError, type AccountPrefs, type LookAdj, type LookSpec, type SkinTone, type Wedding } from "./api";
 export type { LookAdj } from "./api";
 
 export const ZONE_COLORS = ["#f2a541", "#e86f5c", "#5b9bd5", "#7cc4a4", "#b38fdc", "#d9c45a"];
@@ -81,12 +81,19 @@ export function useAccountPrefs() {
       api.savePrefs(body).catch(() => toast.error("설정을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요"));
     }, 400);
   };
-  return { look: prefs.look, lookAdj: prefs.lookAdj, set, ready: q.isSuccess };
+  return { look: prefs.look, lookAdj: prefs.lookAdj, skin: prefs.skin ?? null, set, ready: q.isSuccess };
 }
 
-/** 고른 필터 + 조정값 → 엔진에 보낼 필터. 조정 안 했으면 이름 그대로 */
-export function lookSpec(look: string | null, lookAdj: Record<string, LookAdj> | undefined): LookSpec {
-  if (!look) return null;
-  const a = lookAdj?.[look];
-  return a ? { base: look, strength: a.strength, adjust: a.adjust } : look;
+/** 고른 필터 + 조정값 + 피부 톤 → 엔진에 보낼 필터. 조정·피부 톤 없으면 이름 그대로. 필터 없이 피부 톤만이면 base: null */
+export function lookSpec(look: string | null, lookAdj: Record<string, LookAdj> | undefined, skin?: SkinTone | null): LookSpec {
+  const a = look ? lookAdj?.[look] : undefined;
+  if (!skin) return !look ? null : a ? { base: look, strength: a.strength, adjust: a.adjust } : look;
+  return { base: look, strength: a?.strength ?? 1, adjust: a?.adjust ?? {}, skin };
 }
+
+/** 화면에 보이는 피부 톤(엔진 looks.SKIN_TONES와 같은 키) */
+export const SKIN_TONES: { key: SkinTone["key"]; name: string; desc: string }[] = [
+  { key: "milky", name: "뽀얀 피부", desc: "피부만 살짝 밝고 맑게, 노란기를 덜어 냄" },
+  { key: "lively", name: "생기 피부", desc: "복숭아빛 혈색을 살짝(이미 붉으면 덜)" },
+  { key: "warm", name: "따뜻한 피부", desc: "창백하거나 푸르게 뜬 피부만 따뜻하게" },
+];

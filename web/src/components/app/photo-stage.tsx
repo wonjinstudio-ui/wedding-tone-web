@@ -39,9 +39,18 @@ function ZoomKeys() {
   return null;
 }
 
+/** 바꾼 값이 아직 그림에 반영되는 중(2026-11-25 직접 시험: 빠르게 누르면 반영이 안 되는 것처럼 보였음) */
+export function PendingBadge() {
+  return (
+    <span role="status" className="inline-flex items-center gap-1.5 rounded bg-black/70 px-2 py-1 text-xs text-white">
+      <span aria-hidden className="size-1.5 animate-pulse rounded-full bg-white" />반영 중
+    </span>
+  );
+}
+
 export function PhotoStage({ src, beforeSrc, showBefore, label, badge, className, onPick }: {
   src: string | null; beforeSrc?: string | null; showBefore?: boolean; label?: string; badge?: React.ReactNode; className?: string;
-  onPick?: (x: number, y: number, shift: boolean) => void;   // 있으면 '찍기' 모드: 사진을 누른 자리(0~1)를 알려 줌(흰색 찍기, Shift면 순백)
+  onPick?: (x: number, y: number, shift: boolean) => void;   // 있으면 '찍기' 모드: 사진을 누른 자리(0~1)를 알려 줌(화이트 밸런스 스포이트, Shift면 순백)
 }) {
   const cur = showBefore && beforeSrc ? beforeSrc : src;
   return (

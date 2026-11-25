@@ -5,13 +5,13 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useHotkeys } from "react-hotkeys-hook";
-import { Check } from "lucide-react";
+import { Check, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DesktopOnly } from "@/components/app/work-shell";
-import { PhotoStage, isTyping, useHoldSpace } from "@/components/app/photo-stage";
+import { PendingBadge, PhotoStage, isTyping, useHoldSpace } from "@/components/app/photo-stage";
 import { REF_SLIDERS, SliderRow } from "@/components/app/slider-row";
 import { Kbd, LoadError, PanelLabel } from "@/components/app/bits";
 import { api, ApiError, renderUrl, type Settings, type Zone } from "@/lib/api";
@@ -36,9 +36,7 @@ export default function ReferencePage() {
   const [left, setLeft] = useState(true), [right, setRight] = useState(true);
   const [pick, setPick] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [picking, setPicking] = useState(false);     // 흰색 찍기 모드(W)
-  // 앞 구역의 스타일 값으로 시작한 구역 → 어느 구역에서 왔는지(안내 문구용). 2026-11-24 페르소나 3차: 구역이 6개면 스타일 값을 여섯 번 넣게 됨
-  const [prefilled, setPrefilled] = useState<Record<number, number>>({});
+  const [picking, setPicking] = useState(false);     // 화이트 밸런스 스포이트 모드(W)
   const held = useHoldSpace();
   useHotkeys("bracketleft", () => setLeft((v) => !v));
   useHotkeys("bracketright", () => setRight((v) => !v));
@@ -52,7 +50,7 @@ export default function ReferencePage() {
   // 색온도가 비어 있으면(찍은 그대로) 그 구역의 찍힌 색온도로 보여 줌
   const val = (k: keyof Settings) => (S?.[k] as number | null | undefined) ?? (z ? (base(z)[k] as number) : 0) ?? 0;
   const set = (k: keyof Settings, v: number) => z && S && setEdits((e) => ({ ...e, [z.zone]: { ...S, [k]: v } }));
-  const { url } = usePreview(id, z?.ref ?? null, { settings: S ?? undefined, edge: 1600 });
+  const { url, pending } = usePreview(id, z?.ref ?? null, { settings: S ?? undefined, edge: 1600 });
 
   // 같은 구역 사진(아래 줄): 슬라이더를 놓았을 때만 다시 그림
   const strip = useQuery({
@@ -107,7 +105,7 @@ export default function ReferencePage() {
   }, [z, S, act, pick]);
   useEffect(() => () => { if (snapTimer.current) clearTimeout(snapTimer.current); }, []);
 
-  // 흰색 찍기: 누른 자리가 흰색이 되는 색온도·틴트를 엔진에서 받아 슬라이더에 넣음(저장은 '기준으로 저장'에서)
+  // 화이트 밸런스 스포이트: 누른 자리가 흰색이 되는 색온도·틴트를 엔진에서 받아 슬라이더에 넣음(저장은 '기준으로 저장'에서)
   async function pickWhite(x: number, y: number, pure = false) {
     if (!z || !S) return;
     setPicking(false);
@@ -122,8 +120,8 @@ export default function ReferencePage() {
       const what = pure ? "순백으로" : "드레스(아이보리) 기준으로";
       if (r.shaded) toast.warning(`이 사진의 다른 흰 부분보다 어두운 곳이에요(그늘·다른 빛일 수 있어요). 차갑게 잡혔으면 빛을 정면으로 받은 흰 부분을 다시 찍어 주세요 · 색온도 ${r.temp}K · 틴트 ${sign(r.tint)}`);
       else if (r.limited) toast.warning(`슬라이더 끝까지 맞췄어요(정확히는 ${r.exact.temp}K · 틴트 ${r.exact.tint}). 찍은 곳이 흰색이 맞는지 확인해 주세요`);
-      else toast(`찍은 곳을 ${what} 맞췄어요 · 색온도 ${r.temp}K · 틴트 ${sign(r.tint)}${pure ? "" : " · 흰 벽·종이처럼 순백이면 Shift를 누르고 찍기"}`);
-    } catch (x) { toast.error(x instanceof ApiError ? x.message : "흰색을 맞추지 못했어요"); }
+      else toast(`찍은 곳을 ${what} 맞췄어요 · 색온도 ${r.temp}K · 틴트 ${sign(r.tint)}${pure ? "" : " · 흰 벽·종이처럼 순백이면 Shift를 누르고 누르기"}`);
+    } catch (x) { toast.error(x instanceof ApiError ? x.message : "화이트 밸런스를 맞추지 못했어요"); }
   }
 
   async function save() {
@@ -133,20 +131,10 @@ export default function ReferencePage() {
       await api.saveReference(id, z.zone, S);
       await qc.invalidateQueries({ queryKey: ["zones", id] });
       setEdits((e) => { const n = { ...e }; delete n[z.zone]; return n; });
+      // 다음 구역은 0에서 시작(2026-11-25 직접 시험: 구역 1 값이 구역 2로 따라와 헷갈림 — 예전엔 스타일 값을 자동으로 넣었음).
+      // 같은 스타일을 쓰고 싶으면 '구역 N 스타일 값 가져오기' 버튼으로 직접 가져옴
       const nextIdx = zones.findIndex((x, i) => i !== cur && !x.settings);
-      if (nextIdx >= 0) {
-        // 다음 구역이 아직 손대지 않은 구역이면, 방금 저장한 구역의 스타일 값(대비·하이라이트·섀도·채도·샤프닝·비네팅)으로 시작.
-        // 빛 값(노출·색온도·틴트)은 구역마다 다르므로 가져오지 않음. 저장 전이라 '되돌리기'로 0에서 다시 시작할 수 있음.
-        const nz = zones[nextIdx];
-        const style = STYLE_KEYS.some((k) => ((S[k] as number) ?? 0) !== 0);
-        setEdits((e) => {
-          const n = { ...e }; delete n[z.zone];
-          if (style && !n[nz.zone]) { const s2 = { ...base(nz) }; for (const k of STYLE_KEYS) s2[k] = (S[k] as number) ?? 0; n[nz.zone] = s2; }
-          return n;
-        });
-        if (style && !edits[nz.zone]) setPrefilled((p) => ({ ...p, [nz.zone]: z.zone }));
-        setCur(nextIdx);
-      }
+      if (nextIdx >= 0) setCur(nextIdx);
     } catch (x) { toast.error(x instanceof ApiError ? x.message : "저장하지 못했어요"); }
     setSaving(false);
   }
@@ -196,10 +184,10 @@ export default function ReferencePage() {
         <section className="relative min-h-0" aria-label="기준 컷">
           <PhotoStage src={url} beforeSrc={z ? renderUrl(id, z.ref, { mode: "before" }) : null} showBefore={held}
             onPick={picking ? pickWhite : undefined}
-            badge={z && <span className="text-xs text-text-3">구역 {z.zone + 1} · 기준 컷</span>} />
-          {picking && <p role="status" className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded bg-black/75 px-3 py-1.5 text-sm text-white">흰 드레스·흰 벽처럼 원래 흰 곳을 누르세요 · <Kbd>Shift</Kbd>+누르기 순백 · <Kbd>Esc</Kbd> 취소</p>}
-          <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 text-xs text-text-3">
-            <Kbd>Space</Kbd> 누르는 동안 원본 · <Kbd>Z</Kbd> 확대 · <Kbd>W</Kbd> 흰색 찍기
+            badge={z && <span className="flex items-center gap-2 text-xs text-text-3">{url && pending && <PendingBadge />}구역 {z.zone + 1} · 기준 컷</span>} />
+          {picking && <p role="status" className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded bg-black/75 px-3 py-1.5 text-sm text-white">스포이트: 흰 드레스·흰 벽처럼 원래 흰 곳을 누르세요 · <Kbd>Shift</Kbd>+누르기 순백 · <Kbd>Esc</Kbd> 취소</p>}
+          <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs text-text-3">
+            <Kbd>Space</Kbd> 누르는 동안 원본 · <Kbd>Z</Kbd> 확대 · <Kbd>W</Kbd> 스포이트
           </div>
         </section>
 
@@ -219,11 +207,6 @@ export default function ReferencePage() {
                   onChange={(v) => set(d.key as keyof Settings, v)} onCommit={() => z && S && setSnap({ zone: z.zone, s: { ...S } })} />
               ))}
             </div>
-            {z && !z.settings && dirty && prefilled[z.zone] !== undefined && (
-              <p className="mt-4 rounded-lg bg-raised/60 px-3 py-2 text-xs text-text-2">
-                구역 {prefilled[z.zone] + 1}의 스타일 값({STYLE_TEXT})으로 시작했어요. 노출·색온도·하이라이트·섀도는 이 구역에 맞춰 주세요. 처음부터 하려면 아래 <b className="font-medium text-text">되돌리기</b>.
-              </p>
-            )}
             {src && srcDiffers && (
               <button onClick={copyStyle} className="mt-4 block w-full rounded-lg border border-line px-3 py-2 text-left text-sm text-text-2 hover:bg-hover hover:text-text">
                 구역 {src.zone + 1} 스타일 값 가져오기
@@ -232,11 +215,8 @@ export default function ReferencePage() {
             )}
             <button onClick={() => setPicking((v) => !v)} aria-pressed={picking}
               className={cn("mt-4 block w-full rounded-lg border px-3 py-2 text-left text-sm hover:bg-hover", picking ? "border-text text-text" : "border-line text-text-2")}>
-              흰색 찍기 <Kbd>W</Kbd>
-              <span className="mt-0.5 block text-xs text-text-3">사진에서 원래 흰 곳(드레스·벽)을 누르면 그곳이 흰색이 되게 색온도·틴트를 맞춰요. 드레스는 아이보리로 보고 아주 살짝 따뜻하게, Shift를 누르고 찍으면 순백</span>
-            </button>
-            <button onClick={() => setPick(true)} className="mt-4 text-sm text-text-2 underline underline-offset-4 hover:text-text">
-              다른 사진을 기준으로 바꾸기
+              화이트 밸런스 스포이트 <Kbd>W</Kbd>
+              <span className="mt-0.5 block text-xs text-text-3">사진에서 원래 흰 곳(드레스·벽)을 누르면 그곳이 흰색이 되게 색온도·틴트를 맞춰요. 드레스는 아이보리로 보고 아주 살짝 따뜻하게, Shift를 누르고 누르면 순백</span>
             </button>
           </div>
           <div className="space-y-2 border-t border-line p-4">
@@ -256,7 +236,12 @@ export default function ReferencePage() {
 
         {/* 아래: 같은 구역 사진에 옮겨질 모습 */}
         <section className="flex min-w-0 items-center gap-2 overflow-x-auto border-t border-line bg-panel px-3" aria-label="같은 구역 미리보기">
-          <span className="w-20 shrink-0 text-xs leading-tight text-text-3">같은 구역에<br />옮기면</span>
+          {/* 2026-11-25 직접 시험: 기준 컷 바꾸기는 오른쪽 조정 메뉴가 아니라 사진 줄에서(줄 맨 앞 — 끝에 두면 좁은 화면에서 가려짐) */}
+          <button onClick={() => setPick(true)} disabled={!z}
+            className="flex h-[84px] w-[104px] shrink-0 flex-col items-center justify-center gap-1 rounded-[2px] border border-dashed border-line text-xs text-text-2 hover:border-text-2 hover:bg-hover hover:text-text">
+            <ImageIcon className="size-4" />기준 컷 바꾸기
+          </button>
+          <span className="w-16 shrink-0 text-xs leading-tight text-text-3">같은 구역에<br />옮기면</span>
           {z && stripS && strip.data?.map((pid) => <StripThumb key={pid} id={id} pid={pid} settings={stripS} />)}
         </section>
       </div>

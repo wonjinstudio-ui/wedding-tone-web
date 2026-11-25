@@ -47,8 +47,10 @@ export type LookItem = { key: string; name: string; desc: string; builtin: boole
 /** 필터: 이름 그대로, 또는 조정한 필터 {base, strength(0~1.5), adjust(화면 값)} — 엔진 looks.resolve */
 /** 작가 설정(계정에 저장): 고른 필터 · 필터별 조정값 */
 export type LookAdj = { strength: number; adjust: Record<string, number> };
-export type AccountPrefs = { look: string | null; lookAdj: Record<string, LookAdj> };
-export type LookSpec = string | { base: string; strength: number; adjust: Record<string, number> } | null;
+/** 피부 톤(필터와 따로, 겹쳐 씀): 엔진 looks.SKIN_TONES. s는 강도 0~1.5 */
+export type SkinTone = { key: "milky" | "lively" | "warm"; s: number };
+export type AccountPrefs = { look: string | null; lookAdj: Record<string, LookAdj>; skin?: SkinTone | null };
+export type LookSpec = string | { base: string | null; strength: number; adjust: Record<string, number>; skin?: SkinTone } | null;
 
 export const api = {
   me: () => req<{ user: User }>("GET", "/api/me"),
@@ -75,8 +77,8 @@ export const api = {
 
   zones: (id: string) => req<Zone[]>("GET", `/api/weddings/${id}/zones`),
   candidates: (id: string, z: number, n = 12) => req<{ zone: number; current_ref: number; candidates: number[] }>("GET", `/api/weddings/${id}/zones/${z}/candidates?n=${n}`),
-  // 흰색 찍기: x,y(0~1)를 흰색으로 만드는 색온도·틴트(저장 안 함)
-  /** 흰색 찍기: 기본은 아이보리(드레스) 기준으로 아주 살짝 따뜻하게, pure면 완전한 흰색 */
+  // 화이트 밸런스 스포이트: x,y(0~1)를 흰색으로 만드는 색온도·틴트(저장 안 함)
+  /** 화이트 밸런스 스포이트: 기본은 아이보리(드레스) 기준으로 아주 살짝 따뜻하게, pure면 완전한 흰색 */
   pickWhite: (id: string, pid: number, x: number, y: number, pure = false) =>
     req<{ temp: number; tint: number; limited: boolean; clipped: boolean; shaded: boolean; exact: { temp: number; tint: number } }>("POST", `/api/weddings/${id}/photos/${pid}/white`, { x, y, pure }),
   saveReference: (id: string, z: number, settings: Partial<Settings>, refId?: number) =>

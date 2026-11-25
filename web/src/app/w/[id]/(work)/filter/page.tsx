@@ -1,6 +1,7 @@
 "use client";
 // ⑧ 필터: 왼쪽 목록 · 가운데 크게 · 오른쪽 '필터 조정'(강도 + 세부 9개). DESIGN.md 12절
 // 2026-11-23: 기본 필터가 너무 세다는 작가 의견 → 엔진 기본값을 낮추고, 필터마다 수치를 조정해 저장(계정, /api/me/prefs).
+// 2026-11-25: 오른쪽 위 '피부 톤'(뽀얀·생기·따뜻한) — 필터와 따로 고르고 겹쳐 씀. 사람 분리의 피부 부분만 바뀜.
 import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -13,7 +14,7 @@ import { PhotoStage, useHoldSpace } from "@/components/app/photo-stage";
 import { SliderRow, sign, type SliderDef } from "@/components/app/slider-row";
 import { Kbd, PanelLabel } from "@/components/app/bits";
 import { api, renderUrl } from "@/lib/api";
-import { lookSpec, useAccountPrefs, type LookAdj } from "@/lib/hooks";
+import { lookSpec, SKIN_TONES, useAccountPrefs, type LookAdj } from "@/lib/hooks";
 import { usePreview } from "@/lib/preview";
 
 const n0 = (v: number) => String(Math.round(v));
@@ -30,13 +31,14 @@ const ADJ: SliderDef[] = [
   { key: "sharpen", label: "샤프닝", min: 0, max: 100, step: 1, fmt: n0 },
 ];
 const STRENGTH: SliderDef = { key: "strength", label: "강도", min: 0, max: 150, step: 5, fmt: n0, unit: "%", center: 0 };
+const SKIN_STRENGTH: SliderDef = { ...STRENGTH, key: "skin", label: "피부 톤 강도" };
 
 export default function FilterPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const lq = useQuery({ queryKey: ["looks"], queryFn: api.looks });
   const zq = useQuery({ queryKey: ["zones", id], queryFn: () => api.zones(id) });
-  const { look, lookAdj, set } = useAccountPrefs();
+  const { look, lookAdj, skin, set } = useAccountPrefs();
   const held = useHoldSpace();
   const options = useMemo(() => [{ key: "", name: "필터 없음", desc: "보정만, 색감은 그대로", adjust: undefined }, ...(lq.data ?? [])], [lq.data]);
   const [sample, setSample] = useState(0);
@@ -61,7 +63,7 @@ export default function FilterPage() {
     });
   };
   const resetAll = () => { if (!look) return; const n = { ...lookAdj }; delete n[look]; set({ lookAdj: n }); };
-  const spec = lookSpec(look, lookAdj);
+  const spec = lookSpec(look, lookAdj, skin);
   const { url } = usePreview(id, pid ?? null, { mode: "learn", edge: 1600, look: spec });
 
   return (
@@ -117,12 +119,33 @@ export default function FilterPage() {
 
         <aside className="flex flex-col border-l border-line bg-panel" aria-label="필터 조정">
           <div className="flex-1 overflow-y-auto px-4 pt-4">
-            <div className="flex items-center justify-between">
+            <PanelLabel>피부 톤</PanelLabel>
+            <p className="mt-1 text-xs text-text-3">필터와 함께 써요. 사람 피부만 바뀌고 드레스·배경은 그대로예요.</p>
+            <div className="mt-3 grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="피부 톤">
+              {[{ key: null, name: "그대로", desc: "피부 톤 바꾸지 않음" }, ...SKIN_TONES].map((t) => {
+                const on = (skin?.key ?? null) === t.key;
+                return (
+                  <button key={t.key ?? "none"} role="radio" aria-checked={on} title={t.desc}
+                    onClick={() => set({ skin: t.key ? { key: t.key, s: skin?.s ?? 1 } : null })}
+                    className={cn("h-9 rounded-lg border border-line text-sm hover:bg-hover", on && "border-text bg-raised font-medium")}>
+                    {t.name}
+                  </button>
+                );
+              })}
+            </div>
+            {skin && (
+              <div className="mt-2">
+                <SliderRow def={SKIN_STRENGTH} value={Math.round(skin.s * 100)} reset={100}
+                  onChange={(v) => set((cur) => (cur.skin ? { skin: { ...cur.skin, s: v / 100 } } : {}))} />
+                <p className="text-xs text-text-3">{SKIN_TONES.find((t) => t.key === skin.key)?.desc}</p>
+              </div>
+            )}
+            <div className="mt-5 flex items-center justify-between border-t border-line pt-4">
               <PanelLabel>필터 조정</PanelLabel>
               {adjusted && <button onClick={resetAll} className="text-xs text-text-2 underline underline-offset-4 hover:text-text">처음 값으로</button>}
             </div>
             {!look || !adj || !defaults ? (
-              <p className="mt-3 text-sm text-text-3">필터를 고르면 세기와 세부 값을 바꿀 수 있어요.</p>
+              <p className="mt-3 pb-4 text-sm text-text-3">필터를 고르면 세기와 세부 값을 바꿀 수 있어요.</p>
             ) : (
               <>
                 <p className="mt-1 text-xs text-text-3">바꾼 값은 이 필터에 기억돼요. 이름을 더블클릭하면 그 항목만 처음 값으로.</p>
