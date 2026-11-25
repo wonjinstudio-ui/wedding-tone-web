@@ -2,6 +2,8 @@
 devdata/
 # 화면 확인용 가짜 사진: 픽셀은 그림이지만 촬영 정보(카메라 일련번호·촬영 시각)는 실제 고객 원본에서 가져옴
 web/public/devfake/
+# API 서버를 DATA_DIR 없이 켰을 때 생기는 기본 데이터 폴더(계정·작업 데이터베이스)
+server/data/
 
 node_modules/
 .next/
