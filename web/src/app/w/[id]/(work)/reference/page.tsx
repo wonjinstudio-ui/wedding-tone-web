@@ -16,7 +16,7 @@ import { REF_SLIDERS, SliderRow } from "@/components/app/slider-row";
 import { Kbd, LoadError, PanelLabel } from "@/components/app/bits";
 import { api, ApiError, renderUrl, type Settings, type Zone } from "@/lib/api";
 import { usePreview } from "@/lib/preview";
-import { zoneColor } from "@/lib/hooks";
+import { useAccountPrefs, zoneColor } from "@/lib/hooks";
 
 // 구역마다 다른 빛 값(노출·색온도·틴트)은 빼고, 작가 스타일 값만 다른 구역에서 가져옴 (2026-11-23 페르소나 피드백)
 // 2026-11-24(페르소나 4차): 하이라이트·섀도는 장면마다 다른 값이라 빼고 진짜 스타일 값만(역광 구역의 섀도 +15가 밤 장면에 따라가던 문제)
@@ -73,13 +73,18 @@ export default function ReferencePage() {
   // 스타일 값 가져올 구역: 목록에서 이 구역 앞쪽으로 가장 가까운 저장된 구역, 없으면 뒤쪽
   const src = z ? [...zones.slice(0, cur).reverse(), ...zones.slice(cur + 1)].find((x) => x.settings) : undefined;
   const srcDiffers = !!(src && S && STYLE_KEYS.some((k) => ((src.settings?.[k] as number) ?? 0) !== ((S[k] as number) ?? 0)));
-  function copyStyle() {
-    if (!z || !S || !src?.settings) return;
+  // 작가별 스타일 이어 쓰기(C2): 이 결혼식에 저장한 구역이 아직 없으면 지난 결혼식 기준 컷의 스타일 값을 가져올 수 있게(자동으로 넣지는 않음)
+  const { refStyle } = useAccountPrefs();
+  const past = !src && refStyle && refStyle.wedding !== id ? refStyle : null;
+  const pastDiffers = !!(past && S && STYLE_KEYS.some((k) => (past.values[k] ?? 0) !== ((S[k] as number) ?? 0)));
+  function applyStyle(values: Partial<Record<(typeof STYLE_KEYS)[number], number>>) {
+    if (!z || !S) return;
     const next = { ...S };
-    for (const k of STYLE_KEYS) next[k] = (src.settings[k] as number) ?? 0;
+    for (const k of STYLE_KEYS) next[k] = values[k] ?? 0;
     setEdits((e) => ({ ...e, [z.zone]: next }));
     setSnap({ zone: z.zone, s: next });
   }
+  const copyStyle = () => src?.settings && applyStyle(Object.fromEntries(STYLE_KEYS.map((k) => [k, src.settings![k] as number])));
   const snapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -211,6 +216,12 @@ export default function ReferencePage() {
               <button onClick={copyStyle} className="mt-4 block w-full rounded-lg border border-line px-3 py-2 text-left text-sm text-text-2 hover:bg-hover hover:text-text">
                 구역 {src.zone + 1} 스타일 값 가져오기
                 <span className="mt-0.5 block text-xs text-text-3">{STYLE_TEXT} (노출·색온도·하이라이트·섀도는 그대로)</span>
+              </button>
+            )}
+            {past && pastDiffers && (
+              <button onClick={() => applyStyle(past.values)} className="mt-4 block w-full rounded-lg border border-line px-3 py-2 text-left text-sm text-text-2 hover:bg-hover hover:text-text">
+                지난 결혼식 스타일 값 가져오기
+                <span className="mt-0.5 block text-xs text-text-3">‘{past.title}’의 {STYLE_TEXT} (노출·색온도·하이라이트·섀도는 그대로)</span>
               </button>
             )}
             <button onClick={() => setPicking((v) => !v)} aria-pressed={picking}

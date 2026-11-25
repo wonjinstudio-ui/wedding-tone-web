@@ -146,7 +146,7 @@ function cleanPrefs(b) {
   return out;
 }
 
-function readPrefs(ctx, userId) {
+export function readPrefs(ctx, userId) {
   const r = ctx.db.app.get('SELECT data FROM user_prefs WHERE user_id=?', userId);
   return r ? JSON.parse(r.data) : { look: null, lookAdj: {} };
 }

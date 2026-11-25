@@ -141,8 +141,15 @@ test('작업 흐름: 분석 → 보정 화면 중계 → 학습 → 체험으로
   const meId = (await call('GET', '/api/me', { token: A })).body.user.id;
   assert.ok(engineCalls.every((c) => c.key === 'k123'));
   assert.match(engineCalls[1].url, new RegExp(`user=${meId}`));
-  r = await call('PUT', `/api/weddings/${wid}/zones/0/reference`, { token: A, json: { settings: { exposure: 0.2 } } });
+  r = await call('PUT', `/api/weddings/${wid}/zones/0/reference`, { token: A, json: { settings: { exposure: 0.2, sharpen: 20, contrast: 5 } } });
   assert.equal(r.status, 200);
+  assert.deepEqual(JSON.parse(engineCalls.at(-1).body).settings, { exposure: 0.2, sharpen: 20, contrast: 5 });
+  // 작가별 스타일 이어 쓰기(C2): 기준 컷 스타일 값이 계정에 남고, 다른 작가에게는 없음. 화면에서 직접 바꿀 수는 없음
+  let pr = (await call('GET', '/api/me/prefs', { token: A })).body.prefs.refStyle;
+  assert.deepEqual(pr.values, { contrast: 5, saturation: 0, sharpen: 20, vignette: 0 }); assert.equal(pr.wedding, wid);
+  assert.equal((await call('GET', '/api/me/prefs', { token: B })).body.prefs.refStyle, undefined);
+  await call('PUT', '/api/me/prefs', { token: A, json: { refStyle: { wedding: 'x', title: 'x', values: {} } } });
+  assert.equal((await call('GET', '/api/me/prefs', { token: A })).body.prefs.refStyle.wedding, wid);
   assert.equal((await call('GET', `/api/weddings/${wid}/zones`, { token: B })).status, 404);           // 남의 결혼식 중계 안 됨
   r = await call('POST', `/api/weddings/${wid}/learn`, { token: A });
   assert.equal(r.status, 202);
@@ -230,7 +237,7 @@ test('구글 로그인 흐름(가짜 구글): state 확인 → 계정 만들기 
 
 test('작가 설정(필터 조정값)은 계정마다 따로 저장', async () => {
   let r = await call('GET', '/api/me/prefs', { token: A });
-  assert.equal(r.status, 200); assert.deepEqual(r.body.prefs, { look: null, lookAdj: {} });
+  assert.equal(r.status, 200); assert.deepEqual({ look: r.body.prefs.look, lookAdj: r.body.prefs.lookAdj }, { look: null, lookAdj: {} });
   r = await call('PUT', '/api/me/prefs', { token: A, json: { look: 'clear_morning', lookAdj: { clear_morning: { strength: 0.8, adjust: { fade: 12, glow: 15 } } } } });
   assert.equal(r.status, 200);
   r = await call('PUT', '/api/me/prefs', { token: A, json: { look: 'spring_film' } });                 // 일부만 바꿔도 나머지는 그대로

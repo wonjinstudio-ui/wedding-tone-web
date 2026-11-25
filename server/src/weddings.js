@@ -4,7 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { pipeline } from 'node:stream/promises';
 import { HttpError, send, readJson, readBody, cookie } from './http.js';
-import { requireUser, checkPassword } from './auth.js';
+import { requireUser, checkPassword, readPrefs } from './auth.js';
 import { newId, now, isoAfter, submitJob, jobView, activeJob, lastJob } from './db.js';
 
 const NAME = /^[A-Za-z0-9가-힣._ ()\-]{1,120}\.(jpe?g)$/i;
@@ -302,6 +302,29 @@ function proxy({ write = false, withUser = false } = {}) {
   };
 }
 
+// 작가별 스타일 이어 쓰기(2026-11-25, 톤 보정 C2): 기준 컷을 저장하면 스타일 값(대비·채도·샤프닝·비네팅)을 계정에 기억해
+// 다음 결혼식의 첫 기준 컷에서 '지난 결혼식 스타일 값 가져오기'로 씀. 노출·색온도·틴트·하이라이트·섀도는 장면마다 달라서 뺌
+// (페르소나 시험 결혼식 3쌍: 같은 작가의 다음 결혼식 기준 컷과 스타일 값 차이 합 15~20 → 0~5).
+const STYLE_KEYS = ['contrast', 'saturation', 'sharpen', 'vignette'];
+async function putReference(ctx, req, res, params) {
+  const u = requireUser(ctx, req);
+  const w = wedding(ctx, u, params.id);
+  needPrepared(ctx, w);
+  needIdle(ctx, w);
+  const j = await readJson(req);
+  const r = await engine(ctx, 'PUT', `/v1/weddings/${w.id}/zones/${encodeURIComponent(params.z)}/reference`, JSON.stringify(j));
+  const s = j?.settings;
+  if (r.ok && s && typeof s === 'object') {
+    const values = Object.fromEntries(STYLE_KEYS.map((k) => [k, Number(s[k] ?? 0)]));
+    if (Object.values(values).every(Number.isFinite)) {
+      const next = { ...readPrefs(ctx, u.id), refStyle: { wedding: w.id, title: w.title, values } };
+      ctx.db.app.run('INSERT INTO user_prefs (user_id, data, updated_at) VALUES (?,?,?) ON CONFLICT(user_id) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at',
+        u.id, JSON.stringify(next), now());
+    }
+  }
+  await relay(res, r);
+}
+
 async function looks(ctx, req, res, params) {
   const u = requireUser(ctx, req);
   const url = new URL(req.url, 'http://x');
@@ -344,7 +367,7 @@ export function weddingRoutes(router) {
     // 엔진 API 중계(보정 화면)
     .add('GET', `${W}/zones`, proxy())
     .add('GET', `${W}/zones/:z/candidates`, proxy())
-    .add('PUT', `${W}/zones/:z/reference`, proxy({ write: true }))
+    .add('PUT', `${W}/zones/:z/reference`, putReference)
     .add('GET', `${W}/fixes`, proxy())
     .add('PUT', `${W}/fixes/:pid`, proxy({ write: true }))
     .add('GET', `${W}/photos`, proxy())

@@ -81,7 +81,7 @@ export function useAccountPrefs() {
       api.savePrefs(body).catch(() => toast.error("설정을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요"));
     }, 400);
   };
-  return { look: prefs.look, lookAdj: prefs.lookAdj, skin: prefs.skin ?? null, set, ready: q.isSuccess };
+  return { look: prefs.look, lookAdj: prefs.lookAdj, skin: prefs.skin ?? null, refStyle: prefs.refStyle ?? null, set, ready: q.isSuccess };
 }
 
 /** 고른 필터 + 조정값 + 피부 톤 → 엔진에 보낼 필터. 조정·피부 톤 없으면 이름 그대로. 필터 없이 피부 톤만이면 base: null */

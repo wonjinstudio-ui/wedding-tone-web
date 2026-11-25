@@ -49,7 +49,9 @@ export type LookItem = { key: string; name: string; desc: string; builtin: boole
 export type LookAdj = { strength: number; adjust: Record<string, number> };
 /** 피부 톤(필터와 따로, 겹쳐 씀): 엔진 looks.SKIN_TONES. s는 강도 0~1.5 */
 export type SkinTone = { key: "milky" | "lively" | "warm"; s: number };
-export type AccountPrefs = { look: string | null; lookAdj: Record<string, LookAdj>; skin?: SkinTone | null };
+/** 지난 결혼식 기준 컷의 스타일 값(서버가 기준 컷 저장 때 기록, 2026-11-25 C2) */
+export type RefStyle = { wedding: string; title: string; values: Record<"contrast" | "saturation" | "sharpen" | "vignette", number> };
+export type AccountPrefs = { look: string | null; lookAdj: Record<string, LookAdj>; skin?: SkinTone | null; refStyle?: RefStyle };
 export type LookSpec = string | { base: string | null; strength: number; adjust: Record<string, number>; skin?: SkinTone } | null;
 
 export const api = {
